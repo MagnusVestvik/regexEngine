@@ -5,11 +5,24 @@ use std::collections::HashSet;
 * det stemmer overens med lengden av pattern.
 */
 //////// AST ////////
+
+#[allow(dead_code)]
+enum Rangeable {
+    CharLiteral(char),
+    NumLiteral(char),
+}
+
+#[allow(dead_code)]
+enum Word {
+    WhiteSpace,
+    Range(Rangeable),
+}
+#[allow(dead_code)]
 enum RegexAST {
-    StringLiteral(Box<char>),
-    NumericLiteral(Box<u32>),
+    Word(Word),
     Any(Box<RegexAST>),
-    Range(Box<RegexAST>, Box<RegexAST>),
+    Range(Rangeable, Rangeable),
+    NewLine,
 }
 
 //////// AST ////////
