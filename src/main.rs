@@ -1,11 +1,11 @@
 use std::collections::HashSet;
+use strd::collections::Chars;
 
 /*
 * bools array med true hvor det er match false ellers sjekker deretter lengden av true for å se om
 * det stemmer overens med lengden av pattern.
 */
 //////// AST ////////
-
 #[allow(dead_code)]
 enum Rangeable {
     CharLiteral(char),
@@ -24,7 +24,6 @@ enum RegexAST {
     Range(Rangeable, Rangeable),
     NewLine,
 }
-
 //////// AST ////////
 //////// Semantics ////////
 fn num_sequence_to_char(range: HashSet<u32>) -> HashSet<char> {
@@ -60,6 +59,17 @@ fn all_letters() -> HashSet<u32> {
 }
 
 //////// Semantics ////////
+
+//////// Parser ////////
+
+fn parse_expr(chars: &mut Chars) -> Result<RegexAST, String> {}
+
+fn parse_regex(text_match: &str) -> Result<RegexAST, String> {
+    let mut chars = text_match.chars();
+    parse_expr(chars)
+}
+
+//////// Parser ////////
 
 //////// Tests ////////
 fn test_custom_sequence() {
