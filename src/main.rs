@@ -5,6 +5,10 @@ use strd::collections::Chars;
 * bools array med true hvor det er match false ellers sjekker deretter lengden av true for å se om
 * det stemmer overens med lengden av pattern.
 */
+//////// CONSTANTS ////////
+const ALL_CHARS: HashSet<u32> = all_letters();
+//////// CONSTANTS ////////
+
 //////// AST ////////
 #[allow(dead_code)]
 enum Rangeable {
@@ -23,6 +27,8 @@ enum RegexAST {
     Any(Box<RegexAST>),
     Range(Rangeable, Rangeable),
     NewLine,
+    ZeroOrMany,
+    OneOrMany,
 }
 //////// AST ////////
 //////// Semantics ////////
@@ -62,11 +68,11 @@ fn all_letters() -> HashSet<u32> {
 
 //////// Parser ////////
 
-fn parse_expr(chars: &mut Chars) -> Result<RegexAST, String> {}
-
 fn parse_regex(text_match: &str) -> Result<RegexAST, String> {
     let mut chars = text_match.chars();
-    parse_expr(chars)
+    while let Some(&c) = chars.peek() {
+        match c {}
+    }
 }
 
 //////// Parser ////////
