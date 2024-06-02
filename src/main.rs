@@ -15,7 +15,7 @@ lazy_static! {
 #[allow(dead_code)]
 enum Rangeable {
     CharLiteral(char),
-    NumLiteral(char),
+    NumLiteral(u8),
 }
 
 #[allow(dead_code)]
@@ -25,13 +25,16 @@ enum Word {
 }
 #[allow(dead_code)]
 enum RegexAST {
+    CharLiteral(char),
+    NumLiteral(u8),
     Word(Word),
     Any(Box<RegexAST>),
-    Range(Rangeable, Rangeable),
+    Range(Box<RegexAST>, Box<RegexAST>),
     Sequence(Vec<RegexAST>),
     NewLine,
     ZeroOrMany,
     OneOrMany,
+    WhiteSpace,
 }
 //////// AST ////////
 //////// Semantics ////////
@@ -78,15 +81,20 @@ fn parse_regex(text_match: &str) -> Result<RegexAST, String> {
         match c {
             '\\' => {
                 match chars.next() {
-                    'w' => "",
-                    's' => "",
-                    'd' => sequence.push(Rangeable::NumLiteral(c)),
-                    _ => sequence.push(Rangeable::CharLiteral(c)),
+                    'w' => sequence.push(RegexAST::Word(c)),
+                    's' => sequence.push(RegexAST::WhiteSpace),
+                    'd' => sequence.push(RegexAST::NumLiteral(c as u8)),
+                    _ => sequence.push(RegexAST::CharLiteral(c)),
                 };
             }
-            '.' => {}
-            '*' => {}
-            '+' => {}
+            '.' => {
+                sequence.push(RegexAST::Any);
+            '*' => {
+                    sequence.push(RegexAST::ZeroOrMany)
+                }
+            '+' => {
+                    sequence.push(RegexAST::OneOrMany)
+                }
             _ => sequence.push(Rangeable::CharLiteral(c)),
         };
     }
