@@ -1,14 +1,16 @@
+use lazy_static::lazy_static;
 use std::collections::HashSet;
-use strd::collections::Chars;
+use std::str::Chars;
 
 /*
 * bools array med true hvor det er match false ellers sjekker deretter lengden av true for å se om
 * det stemmer overens med lengden av pattern.
 */
 //////// CONSTANTS ////////
-const ALL_CHARS: HashSet<u32> = all_letters();
-//////// CONSTANTS ////////
-
+lazy_static! {
+    static ref ALL_CHARS: HashSet<char> = num_sequence_to_char(all_letters());
+}
+///// CONSTANTS ////////
 //////// AST ////////
 #[allow(dead_code)]
 enum Rangeable {
@@ -26,6 +28,7 @@ enum RegexAST {
     Word(Word),
     Any(Box<RegexAST>),
     Range(Rangeable, Rangeable),
+    Sequence(Vec<RegexAST>),
     NewLine,
     ZeroOrMany,
     OneOrMany,
@@ -69,10 +72,25 @@ fn all_letters() -> HashSet<u32> {
 //////// Parser ////////
 
 fn parse_regex(text_match: &str) -> Result<RegexAST, String> {
-    let mut chars = text_match.chars();
+    let mut chars = text_match.chars().peekable();
+    let mut sequence = Vec::new();
     while let Some(&c) = chars.peek() {
-        match c {}
+        match c {
+            '\\' => {
+                match chars.next() {
+                    'w' => "",
+                    's' => "",
+                    'd' => sequence.push(Rangeable::NumLiteral(c)),
+                    _ => sequence.push(Rangeable::CharLiteral(c)),
+                };
+            }
+            '.' => {}
+            '*' => {}
+            '+' => {}
+            _ => sequence.push(Rangeable::CharLiteral(c)),
+        };
     }
+    return Ok(RegexAST::Sequence(sequence));
 }
 
 //////// Parser ////////
