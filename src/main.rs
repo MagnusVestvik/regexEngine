@@ -27,7 +27,7 @@ enum Word {
 enum RegexAST {
     CharLiteral(char),
     NumLiteral(u8),
-    Word(Word),
+    Word(Box<RegexAST>),
     Any(Box<RegexAST>),
     Range(Box<RegexAST>, Box<RegexAST>),
     Sequence(Vec<RegexAST>),
@@ -80,22 +80,25 @@ fn parse_regex(text_match: &str) -> Result<RegexAST, String> {
     while let Some(&c) = chars.peek() {
         match c {
             '\\' => {
-                match chars.next() {
-                    'w' => sequence.push(RegexAST::Word(c)),
-                    's' => sequence.push(RegexAST::WhiteSpace),
-                    'd' => sequence.push(RegexAST::NumLiteral(c as u8)),
-                    _ => sequence.push(RegexAST::CharLiteral(c)),
-                };
+                if let Some(escaped) = chars.next() {
+                    match escaped {
+                        'w' => {
+                            sequence.push(RegexAST::Word(Box::new(RegexAST::CharLiteral(escaped))))
+                        }
+                        's' => sequence.push(RegexAST::WhiteSpace),
+                        'd' => sequence.push(RegexAST::NumLiteral(c as u8)),
+                        _ => sequence.push(RegexAST::CharLiteral(c)),
+                    };
+                }
             }
             '.' => {
-                sequence.push(RegexAST::Any);
-            '*' => {
-                    sequence.push(RegexAST::ZeroOrMany)
-                }
-            '+' => {
-                    sequence.push(RegexAST::OneOrMany)
-                }
-            _ => sequence.push(Rangeable::CharLiteral(c)),
+                sequence.push(RegexAST::Box::new(Any)); // this needs to be recursivly called or
+                                                        // somthing
+            }
+            '*' => sequence.push(RegexAST::ZeroOrMany),
+            '+' => sequence.push(RegexAST::OneOrMany),
+            _ => sequence.push(Rangeable::CharLiteral(c)), // this also needs to be recursivly
+                                                           // called or somthing
         };
     }
     return Ok(RegexAST::Sequence(sequence));
