@@ -39,42 +39,7 @@ enum RegexAST {
     AnyWord,
     Zero,
 }
-impl RegexAST {
-    fn iterate_inner_element(&self) {
-        match self {
-            RegexAST::CharLiteral(c) => println!("CharLiteral: {}", c),
-            RegexAST::NumLiteral(n) => println!("NumLiteral"),
-            RegexAST::Word(inner) => {
-                println!("Word:");
-                inner.iterate_inner_element(); // recursively handle inner `RegexAST`
-            }
-            RegexAST::Any => println!("Any"),
-            RegexAST::Range(start, end) => {
-                println!("Range:");
-                start.iterate_inner_element(); // recursively handle start
-                end.iterate_inner_element(); // recursively handle end
-            }
-            RegexAST::Sequence(inner_seq) => {
-                println!("Sequence:");
-                for inner_ast in inner_seq {
-                    inner_ast.iterate_inner_element(); // recursively handle inner sequence
-                }
-            }
-            RegexAST::NewLine => println!("NewLine"),
-            RegexAST::ZeroOrMany(inner) => {
-                println!("ZeroOrMany:");
-                inner.iterate_inner_element(); // recursively handle inner `RegexAST`
-            }
-            RegexAST::OneOrMany(inner) => {
-                println!("OneOrMany:");
-                inner.iterate_inner_element(); // recursively handle inner `RegexAST`
-            }
-            RegexAST::WhiteSpace => println!("WhiteSpace"),
-            RegexAST::AnyDigit => println!("AnyDigit"),
-            RegexAST::AnyWord => println!("AnyWord"),
-        }
-    }
-}
+
 //////// AST ////////
 //////// Semantics ////////
 fn num_sequence_to_char(range: HashSet<u32>) -> HashSet<char> {
@@ -205,6 +170,12 @@ mod tests {
     fn test_parse_zero_or_many() {
         let pattern = "a*";
         let expected = vec![RegexAST::ZeroOrMany(Box::new(RegexAST::CharLiteral('a')))];
+        assert_eq!(parse_regex(pattern), Ok(expected));
+    }
+    #[test]
+    fn test_parse_empty_zero_or_many() {
+        let pattern = "*";
+        let expected = vec![RegexAST::ZeroOrMany(Box::new(RegexAST::Zero))];
         assert_eq!(parse_regex(pattern), Ok(expected));
     }
 
