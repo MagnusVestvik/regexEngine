@@ -107,10 +107,10 @@ fn parse_regex(text_match: &str) -> Result<Vec<RegexAST>, String> {
                     if let Some(ast) = parsed.into_iter().next() {
                         sequence.push(RegexAST::ZeroOrMany(Box::new(ast)));
                     } else {
-                        sequence.push(RegexAST::ZeroOrMany(Box::new(RegexAST::Zero)));
+                        return Err("Error parsing previous character".to_string());
                     }
                 } else {
-                    return Err("Syntax error: '*' found without preceding element.".to_string());
+                    sequence.push(RegexAST::ZeroOrMany(Box::new(RegexAST::Zero)));
                 }
             }
             '+' => {
