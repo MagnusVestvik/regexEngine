@@ -37,6 +37,7 @@ enum RegexAST {
     WhiteSpace,
     AnyDigit,
     AnyWord,
+    Zero,
 }
 impl RegexAST {
     fn iterate_inner_element(&self) {
@@ -141,7 +142,7 @@ fn parse_regex(text_match: &str) -> Result<Vec<RegexAST>, String> {
                     if let Some(ast) = parsed.into_iter().next() {
                         sequence.push(RegexAST::ZeroOrMany(Box::new(ast)));
                     } else {
-                        return Err("Error parsing previous character".to_string());
+                        sequence.push(RegexAST::ZeroOrMany(Box::new(RegexAST::Zero)));
                     }
                 } else {
                     return Err("Syntax error: '*' found without preceding element.".to_string());
