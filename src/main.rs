@@ -125,6 +125,9 @@ fn parse_regex(text_match: &str) -> Result<Vec<RegexAST>, String> {
     let mut sequence = Vec::new();
     let mut prev: Option<char> = None;
     while let Some(&c) = chars.peek() {
+        // TODO: update this to chars.next such that iterator does
+        // not have to be pushed forward in the functions, see example from improvment suggestions
+        // from chatgpt https://chatgpt.com/c/cee54427-e4a2-4f4c-ae46-23e2865195f6
         match c {
             '\\' => {
                 chars.next();
@@ -135,6 +138,8 @@ fn parse_regex(text_match: &str) -> Result<Vec<RegexAST>, String> {
                         'd' => sequence.push(RegexAST::AnyDigit),
                         _ => sequence.push(RegexAST::AnyWord),
                     };
+                } else {
+                    sequence.push(RegexAST::CharLiteral('\\'))
                 }
             }
             '.' => {
@@ -161,6 +166,9 @@ fn parse_regex(text_match: &str) -> Result<Vec<RegexAST>, String> {
                     sequence.pop();
                     let parsed = parse_regex(&prev_char.to_string())?;
                     if let Some(ast) = parsed.into_iter().next() {
+                        // TODO: make parsed into a iterator
+                        // and use its next method for pushing correct value instead of creating
+                        // new variable
                         sequence.push(RegexAST::OneOrMany(Box::new(ast)));
                     } else {
                         return Err("Error parsing previous character".to_string());
