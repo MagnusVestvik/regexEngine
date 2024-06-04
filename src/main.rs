@@ -4,7 +4,8 @@ use std::str::Chars;
 
 //////// CONSTANTS ////////
 lazy_static! {
-    static ref ALL_CHARS: HashSet<char> = num_sequence_to_char(all_letters());
+    static ref WORD: HashSet<char> = num_sequence_to_char(all_letters()); // TODO: add hyphen all
+    // numbers, and peiod.
 }
 ///// CONSTANTS ////////
 //////// AST ////////
@@ -32,7 +33,7 @@ fn num_sequence_to_char(range: HashSet<u32>) -> HashSet<char> {
         .collect()
 }
 
-fn custom_sequence(start: u32, end: u32) -> HashSet<u32> {
+fn custom_sequence(start: u8, end: u8) -> HashSet<u8> {
     return (start..=end).collect();
 }
 
@@ -59,9 +60,7 @@ fn all_letters() -> HashSet<u32> {
 fn match_expr(regex_expr: Vec<&RegexAST>, text_match: &str) -> Result<Vec<(usize, usize)>, String> {
     let mut matches = Vec::new();
     for start in 0..text_match.chars().count() {
-        if let Some((_, end)) =
-            match_from_index(regex_expr.clone(), &text_match[start..].chars(), start)
-        {
+        if let Some((_, end)) = match_from_index(regex_expr.clone(), &text_match[start..], start) {
             matches.push((start, end));
         }
     }
@@ -73,50 +72,78 @@ fn match_expr(regex_expr: Vec<&RegexAST>, text_match: &str) -> Result<Vec<(usize
 
 fn match_from_index(
     regex_expr: Vec<&RegexAST>,
-    text: &Chars,
+    text: &str,
     start: usize,
 ) -> Option<(usize, usize)> {
-    let mut current_text = text.peekable();
-    let mut pos = start;
+    let mut current_text = text;
+    let mut current_pos = start;
 
     for expr in regex_expr {
         match expr {
             RegexAST::CharLiteral(c) => {
-                if let Some(current_elem) = current_text.peek() {
-                    if current_elem == c {
-                        pos += 1;
-                    } else {
-                        return None;
-                    }
+                if current_text.starts_with(*c) {
+                    current_text = &current_text[1..];
+                    current_pos += 1;
                 } else {
                     return None;
                 }
             }
             RegexAST::NumLiteral(n) => {
-                if let Some(current_elem) = current_text.peek() {
-                    if current_elem == n as char {
-                        pos += 1;
-                    } else {
-                        return None;
-                    }
+                if !custom_sequence(0, 9).contains(n) {
+                    Err(format!("Syntax error {} is not a number", *n).to_string());
+                }
+                if current_text.starts_with((n + b'0') as char) {
+                    current_text = &current_text[1..];
+                    current_pos += 1;
                 } else {
                     return None;
                 }
             }
-            RegexAST::WhiteSpace => {}
-            RegexAST::Any => {}
+            RegexAST::WhiteSpace => {
+                if current_text.starts_with(' ') {
+                    current_text = &current_text[1..];
+                    current_pos += 1;
+                }
+            }
+            RegexAST::Any => {
+                current_text = &current_text[1..];
+                current_pos += 1;
+            }
             RegexAST::Zero => {}
-            RegexAST::AnyWord(word) => {} // TODO: legg til implementasjon av anyword slik i parser
-            RegexAST::AnyDigit(digit) => {} // TODO: legg til implementasjon av anydigit slik i parser
-            RegexAST::OneOrMany(one_or_many) => {}
+            RegexAST::AnyWord => {
+                if !WORD.contains(get_first_char(&current_text)*?) {
+                    Err("".to_string());
+                }
+            }, // TODO: legg til implementasjon av anyword slik i parser
+            RegexAST::AnyDigit => {} // TODO: legg til implementasjon av anydigit slik i parser
+            RegexAST::OneOrMany(one_or_many) => {
+                if let Some((_, end)) = match_from_index(&[*one_or_many.clone()], current_text, current_pos){
+                    current_text = &current_text[(end- current_pos)..];
+                    current_pos = end;
+                } else{
+                    return None;
+                }
+                while let Some((_, end)) = match_from_index(&[*one_or_many.clone()], current_text, current_pos){
+                    current_text = &current_text[(end - current_pos)..];
+                    current_pos = end;
+                }
+            }
             RegexAST::ZeroOrMany(zero_or_many) => {}
         }
     }
 
-    Some((start, pos))
+    Some((start, current_pos))
 }
 
 //////// Semantics ////////
+
+//////// Helper ////////
+
+fn get_first_char(s: &str) -> Option<char> {
+    s.chars().next()
+}
+
+//////// Helper ////////
 
 //////// Parser ////////
 
@@ -192,7 +219,7 @@ fn parse_regex(text_match: &str) -> Result<Vec<RegexAST>, String> {
 //////// Tests ////////
 fn test_custom_sequence() {
     let char_range: HashSet<u32> = custom_sequence('a' as u32, 'd' as u32);
-    let num_range: HashSet<u32> = custom_sequence(1, 10);
+    let num_range: HashSet<u32> = custom_sequence(1, 9);
     let printable_char_range: HashSet<char> = num_sequence_to_char(char_range);
     println!("Number Range: {:?}", num_range);
     println!("Printable Character Range: {:?}", printable_char_range);
