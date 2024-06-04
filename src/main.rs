@@ -1,5 +1,6 @@
 use lazy_static::lazy_static;
 use std::collections::HashSet;
+use std::str::Chars;
 
 //////// CONSTANTS ////////
 lazy_static! {
@@ -13,7 +14,6 @@ enum RegexAST {
     CharLiteral(char),
     NumLiteral(u8),
     Any,
-    NewLine,
     ZeroOrMany(Box<RegexAST>),
     OneOrMany(Box<RegexAST>),
     WhiteSpace,
@@ -56,31 +56,56 @@ fn all_letters() -> HashSet<u32> {
     small_letters().union(&capital_letters()).copied().collect()
 }
 
-fn match_expr(regex_expr: Vec<&RegexAST>, text_match: &str) -> Result<(usize, usize), String> {
-    for start in 0..text_match.len() {
-        if let Some((_, end)) = match_from_index(regex_expr.clone(), &text_match[start..], start) {
-            return Ok((start, end));
+fn match_expr(regex_expr: Vec<&RegexAST>, text_match: &str) -> Result<Vec<(usize, usize)>, String> {
+    let mut matches = Vec::new();
+    for start in 0..text_match.chars().count() {
+        if let Some((_, end)) =
+            match_from_index(regex_expr.clone(), &text_match[start..].chars(), start)
+        {
+            matches.push((start, end));
         }
     }
-    Err("No match found".to_string())
+    if matches.is_empty() {
+        return Err("No match found".to_string());
+    }
+    return Ok(matches);
 }
 
 fn match_from_index(
     regex_expr: Vec<&RegexAST>,
-    text: &str,
+    text: &Chars,
     start: usize,
 ) -> Option<(usize, usize)> {
-    let mut current_text = text;
+    let mut current_text = text.peekable();
     let mut pos = start;
 
     for expr in regex_expr {
         match expr {
-            RegexAST::CharLiteral(c) => {}
-            RegexAST::NumLiteral(n) => {}
+            RegexAST::CharLiteral(c) => {
+                if let Some(current_elem) = current_text.peek() {
+                    if current_elem == c {
+                        pos += 1;
+                    } else {
+                        return None;
+                    }
+                } else {
+                    return None;
+                }
+            }
+            RegexAST::NumLiteral(n) => {
+                if let Some(current_elem) = current_text.peek() {
+                    if current_elem == n as char {
+                        pos += 1;
+                    } else {
+                        return None;
+                    }
+                } else {
+                    return None;
+                }
+            }
             RegexAST::WhiteSpace => {}
             RegexAST::Any => {}
             RegexAST::Zero => {}
-            RegexAST::Word(regex) => {}
             RegexAST::AnyWord(word) => {} // TODO: legg til implementasjon av anyword slik i parser
             RegexAST::AnyDigit(digit) => {} // TODO: legg til implementasjon av anydigit slik i parser
             RegexAST::OneOrMany(one_or_many) => {}
@@ -88,7 +113,7 @@ fn match_from_index(
         }
     }
 
-    Some((1, 1))
+    Some((start, pos))
 }
 
 //////// Semantics ////////
