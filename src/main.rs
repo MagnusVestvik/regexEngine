@@ -90,7 +90,7 @@ fn match_from_index(
             }
             RegexAST::NumLiteral(n) => {
                 if !custom_sequence(0, 9).contains(n) {
-                    Err(format!("Syntax error {} is not a number", *n).to_string());
+                    return None;
                 }
                 if current_text.starts_with((n + b'0') as char) {
                     current_text = &current_text[1..];
@@ -128,20 +128,21 @@ fn match_from_index(
                 current_pos += 1;
             }
             RegexAST::OneOrMany(one_or_many) => {
-                // TODO: Tenk litt mer på den her, er dette
-                // måten å gjøre det på ???????
-                if let Some((_, end)) = match_from_index(
-                    vec![Box::into_inner(one_or_many)],
-                    current_text,
-                    current_pos,
-                ) {
+                while let Some((_, end)) =
+                    match_from_index(vec![&*one_or_many], current_text, current_pos)
+                {
                     current_text = &current_text[(end - current_pos)..];
                     current_pos = end;
-                } else {
-                    return None;
                 }
             }
-            RegexAST::ZeroOrMany(zero_or_many) => {}
+            RegexAST::ZeroOrMany(zero_or_many) => {
+                while let Some((_, end)) =
+                    match_from_index(vec![&*zero_or_many], current_text, current_pos)
+                {
+                    current_text = &current_text[(end - current_pos)..];
+                    current_pos = end;
+                }
+            }
         }
     }
 
@@ -165,9 +166,6 @@ fn parse_regex(text_match: &str) -> Result<Vec<RegexAST>, String> {
     let mut sequence = Vec::new();
     let mut prev: Option<char> = None;
     while let Some(&c) = chars.peek() {
-        // TODO: update this to chars.next such that iterator does
-        // not have to be pushed forward in the functions, see example from improvment suggestions
-        // from chatgpt https://chatgpt.com/c/cee54427-e4a2-4f4c-ae46-23e2865195f6
         match c {
             '\\' => {
                 chars.next();
@@ -230,13 +228,6 @@ fn parse_regex(text_match: &str) -> Result<Vec<RegexAST>, String> {
 //////// Parser ////////
 
 //////// Tests ////////
-fn test_custom_sequence() {
-    let char_range: HashSet<u32> = custom_sequence('a' as u32, 'd' as u32);
-    let num_range: HashSet<u32> = custom_sequence(1, 9);
-    let printable_char_range: HashSet<char> = num_sequence_to_char(char_range);
-    println!("Number Range: {:?}", num_range);
-    println!("Printable Character Range: {:?}", printable_char_range);
-}
 
 #[cfg(test)]
 mod tests {
@@ -288,12 +279,67 @@ mod tests {
         ];
         assert_eq!(parse_regex(pattern), Ok(expected));
     }
+
+    #[test]
+    fn test_match_expr_char_literal() {
+        let regex = vec![&RegexAST::CharLiteral('a')];
+        let text = "abcabc";
+        let result = match_expr(regex, text).unwrap();
+        assert_eq!(result, vec![(0, 1), (3, 4)]);
+    }
+
+    #[test]
+    fn test_match_expr_num_literal() {
+        let regex = vec![&RegexAST::NumLiteral(1)];
+        let text = "123123";
+        let result = match_expr(regex, text).unwrap();
+        assert_eq!(result, vec![(0, 1), (3, 4)]);
+    }
+
+    #[test]
+    fn test_match_expr_any() {
+        let regex = vec![&RegexAST::Any];
+        let text = "abc";
+        let result = match_expr(regex, text).unwrap();
+        assert_eq!(result, vec![(0, 1), (1, 2), (2, 3)]);
+    }
+
+    #[test]
+    fn test_match_expr_whitespace() {
+        let regex = vec![&RegexAST::WhiteSpace];
+        let text = "a b c";
+        let result = match_expr(regex, text).unwrap();
+        assert_eq!(result, vec![(1, 2), (3, 4)]);
+    }
+
+    #[test]
+    fn test_match_expr_any_digit() {
+        let regex = vec![&RegexAST::AnyDigit];
+        let text = "a1b2c3";
+        let result = match_expr(regex, text).unwrap();
+        assert_eq!(result, vec![(1, 2), (3, 4), (5, 6)]);
+    }
+
+    #[test]
+    fn test_match_expr_any_word() {
+        let regex = vec![&RegexAST::AnyWord];
+        let text = "abc123";
+        let result = match_expr(regex, text).unwrap();
+        assert_eq!(result, vec![(0, 1), (1, 2), (2, 3)]);
+    }
+
+    #[test]
+    fn test_match_expr_no_match() {
+        let regex = vec![&RegexAST::CharLiteral('x')];
+        let text = "abc";
+        let result = match_expr(regex, text);
+        assert!(result.is_err());
+    }
 }
 
 //////// Tests ////////
 
 fn main() {
-    test_custom_sequence();
     let all_letters_as_nums = all_letters();
     let all_letters = num_sequence_to_char(all_letters_as_nums);
     println!("these are all the letters \n {:?}", all_letters.into_iter());
