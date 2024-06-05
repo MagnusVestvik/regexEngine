@@ -111,21 +111,34 @@ fn match_from_index(
             }
             RegexAST::Zero => {}
             RegexAST::AnyWord => {
-                if !WORD.contains(get_first_char(&current_text)*?) {
-                    Err("".to_string());
-                }
-            }, // TODO: legg til implementasjon av anyword slik i parser
-            RegexAST::AnyDigit => {} // TODO: legg til implementasjon av anydigit slik i parser
-            RegexAST::OneOrMany(one_or_many) => {
-                if let Some((_, end)) = match_from_index(&[*one_or_many.clone()], current_text, current_pos){
-                    current_text = &current_text[(end- current_pos)..];
-                    current_pos = end;
-                } else{
+                let first_char = get_first_char(&current_text)?;
+                if !WORD.contains(&first_char) {
                     return None;
                 }
-                while let Some((_, end)) = match_from_index(&[*one_or_many.clone()], current_text, current_pos){
+                current_text = &current_text[1..];
+                current_pos += 1;
+            }
+            RegexAST::AnyDigit => {
+                let first_char_as_digit = get_first_char(&current_text)? as u8;
+                let num_range: Vec<u8> = (0..=9).collect();
+                if !num_range.contains(&first_char_as_digit) {
+                    return None;
+                }
+                current_text = &current_text[1..];
+                current_pos += 1;
+            }
+            RegexAST::OneOrMany(one_or_many) => {
+                // TODO: Tenk litt mer på den her, er dette
+                // måten å gjøre det på ???????
+                if let Some((_, end)) = match_from_index(
+                    vec![Box::into_inner(one_or_many)],
+                    current_text,
+                    current_pos,
+                ) {
                     current_text = &current_text[(end - current_pos)..];
                     current_pos = end;
+                } else {
+                    return None;
                 }
             }
             RegexAST::ZeroOrMany(zero_or_many) => {}
