@@ -103,6 +103,8 @@ fn match_from_index(
                 if current_text.starts_with(' ') {
                     current_text = &current_text[1..];
                     current_pos += 1;
+                } else {
+                    return None;
                 }
             }
             RegexAST::Any => {
@@ -120,8 +122,8 @@ fn match_from_index(
             }
             RegexAST::AnyDigit => {
                 let first_char_as_digit = get_first_char(&current_text)? as u8;
-                let num_range: Vec<u8> = (0..=9).collect();
-                if !num_range.contains(&first_char_as_digit) {
+                if !first_char_as_digit.is_ascii_digit() {
+                    // blir ikke true
                     return None;
                 }
                 current_text = &current_text[1..];
@@ -334,6 +336,20 @@ mod tests {
         let text = "abc";
         let result = match_expr(regex, text);
         assert!(result.is_err());
+    }
+    #[test]
+    fn test_match_expr_multi_match() {
+        let regex = vec![
+            &RegexAST::WhiteSpace,
+            &RegexAST::CharLiteral('h'),
+            &RegexAST::CharLiteral('e'),
+            &RegexAST::CharLiteral('l'),
+            &RegexAST::CharLiteral('l'),
+            &RegexAST::CharLiteral('o'),
+        ];
+        let text = " hello jumpa torvaldsen hello";
+        let result = match_expr(regex, text).unwrap();
+        assert_eq!(result, vec![(0, 6), (23, 29)]);
     }
 }
 
