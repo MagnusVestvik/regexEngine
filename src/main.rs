@@ -1,6 +1,5 @@
 use lazy_static::lazy_static;
 use std::collections::HashSet;
-use std::str::Chars;
 
 //////// CONSTANTS ////////
 lazy_static! {
@@ -15,8 +14,8 @@ enum RegexAST {
     CharLiteral(char),
     NumLiteral(u8),
     Any,
-    ZeroOrMany(Box<RegexAST>),
-    OneOrMany(Box<RegexAST>),
+    ZeroOrMany(Vec<RegexAST>),
+    OneOrMany(Vec<RegexAST>),
     WhiteSpace,
     AnyDigit,
     AnyWord,
@@ -130,16 +129,14 @@ fn match_from_index(
                 current_pos += 1;
             }
             RegexAST::OneOrMany(one_or_many) => {
-                while let Some((_, end)) =
-                    match_from_index(vec![&*one_or_many], current_text, current_pos)
+                while let Some((_, end)) = match_from_index(one_or_many, current_text, current_pos)
                 {
                     current_text = &current_text[(end - current_pos)..];
                     current_pos = end;
                 }
             }
             RegexAST::ZeroOrMany(zero_or_many) => {
-                while let Some((_, end)) =
-                    match_from_index(vec![&*zero_or_many], current_text, current_pos)
+                while let Some((_, end)) = match_from_index(zero_or_many, current_text, current_pos)
                 {
                     current_text = &current_text[(end - current_pos)..];
                     current_pos = end;
@@ -188,34 +185,34 @@ fn parse_regex(text_match: &str) -> Result<Vec<RegexAST>, String> {
             }
             '*' => {
                 chars.next();
+                let mut zero_or_many: Vec<RegexAST> = Vec::new();
                 if let Some(prev_char) = prev {
                     sequence.pop();
                     let parsed = parse_regex(&prev_char.to_string())?;
                     if let Some(ast) = parsed.into_iter().next() {
-                        sequence.push(RegexAST::ZeroOrMany(Box::new(ast)));
+                        zero_or_many.push(ast);
                     } else {
                         return Err("Error parsing previous character".to_string());
                     }
                 } else {
-                    sequence.push(RegexAST::ZeroOrMany(Box::new(RegexAST::Zero)));
+                    sequence.push(RegexAST::ZeroOrMany(zero_or_many));
                 }
             }
             '+' => {
                 chars.next();
+                let mut one_or_many: Vec<RegexAST> = Vec::new();
                 if let Some(prev_char) = prev {
                     sequence.pop();
                     let parsed = parse_regex(&prev_char.to_string())?;
                     if let Some(ast) = parsed.into_iter().next() {
-                        // TODO: make parsed into a iterator
-                        // and use its next method for pushing correct value instead of creating
-                        // new variable
-                        sequence.push(RegexAST::OneOrMany(Box::new(ast)));
+                        one_or_many.push(ast);
                     } else {
                         return Err("Error parsing previous character".to_string());
                     }
                 } else {
                     return Err("Syntax error: '+' found without preceding element.".to_string());
                 }
+                sequence.push(RegexAST::OneOrMany(one_or_many));
             }
             _ => {
                 chars.next();
