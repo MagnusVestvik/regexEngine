@@ -129,14 +129,21 @@ fn match_from_index(
                 current_pos += 1;
             }
             RegexAST::OneOrMany(one_or_many) => {
-                while let Some((_, end)) = match_from_index(one_or_many, current_text, current_pos)
+                let mut at_least_one = false;
+                while let Some((_, end)) =
+                    match_from_index(one_or_many.iter().collect(), current_text, current_pos)
                 {
                     current_text = &current_text[(end - current_pos)..];
                     current_pos = end;
+                    at_least_one = true;
+                }
+                if !at_least_one {
+                    return None;
                 }
             }
             RegexAST::ZeroOrMany(zero_or_many) => {
-                while let Some((_, end)) = match_from_index(zero_or_many, current_text, current_pos)
+                while let Some((_, end)) =
+                    match_from_index(zero_or_many.iter().collect(), current_text, current_pos)
                 {
                     current_text = &current_text[(end - current_pos)..];
                     current_pos = end;
@@ -191,12 +198,9 @@ fn parse_regex(text_match: &str) -> Result<Vec<RegexAST>, String> {
                     let parsed = parse_regex(&prev_char.to_string())?;
                     if let Some(ast) = parsed.into_iter().next() {
                         zero_or_many.push(ast);
-                    } else {
-                        return Err("Error parsing previous character".to_string());
                     }
-                } else {
-                    sequence.push(RegexAST::ZeroOrMany(zero_or_many));
                 }
+                sequence.push(RegexAST::ZeroOrMany(zero_or_many));
             }
             '+' => {
                 chars.next();
@@ -249,20 +253,14 @@ mod tests {
     #[test]
     fn test_parse_zero_or_many() {
         let pattern = "a*";
-        let expected = vec![RegexAST::ZeroOrMany(Box::new(RegexAST::CharLiteral('a')))];
-        assert_eq!(parse_regex(pattern), Ok(expected));
-    }
-    #[test]
-    fn test_parse_empty_zero_or_many() {
-        let pattern = "*";
-        let expected = vec![RegexAST::ZeroOrMany(Box::new(RegexAST::Zero))];
+        let expected = vec![RegexAST::ZeroOrMany(vec![RegexAST::CharLiteral('a')])];
         assert_eq!(parse_regex(pattern), Ok(expected));
     }
 
     #[test]
-    fn test_parse_one_or_many() {
-        let pattern = "a+";
-        let expected = vec![RegexAST::OneOrMany(Box::new(RegexAST::CharLiteral('a')))];
+    fn test_parse_empty_zero_or_many() {
+        let pattern = "*";
+        let expected = vec![RegexAST::ZeroOrMany(vec![])];
         assert_eq!(parse_regex(pattern), Ok(expected));
     }
 
@@ -271,8 +269,8 @@ mod tests {
         let pattern = "a.*b+c\\d";
         let expected = vec![
             RegexAST::CharLiteral('a'),
-            RegexAST::ZeroOrMany(Box::new(RegexAST::Any)),
-            RegexAST::OneOrMany(Box::new(RegexAST::CharLiteral('b'))),
+            RegexAST::ZeroOrMany(vec![RegexAST::Any]),
+            RegexAST::OneOrMany(vec![RegexAST::CharLiteral('b')]),
             RegexAST::CharLiteral('c'),
             RegexAST::AnyDigit,
         ];
@@ -353,7 +351,5 @@ mod tests {
 //////// Tests ////////
 
 fn main() {
-    let all_letters_as_nums = all_letters();
-    let all_letters = num_sequence_to_char(all_letters_as_nums);
-    println!("these are all the letters \n {:?}", all_letters.into_iter());
+    println!("Hello world!");
 }
