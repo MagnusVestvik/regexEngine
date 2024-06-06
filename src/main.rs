@@ -76,7 +76,9 @@ fn match_from_index(
 ) -> Option<(usize, usize)> {
     let mut current_text = text;
     let mut current_pos = start;
-
+    if text.len() < 1 {
+        return None;
+    }
     for expr in regex_expr {
         match expr {
             RegexAST::CharLiteral(c) => {
@@ -345,6 +347,16 @@ mod tests {
         let text = " hello jumpa torvaldsen hello";
         let result = match_expr(regex, text).unwrap();
         assert_eq!(result, vec![(0, 6), (23, 29)]);
+    }
+
+    #[test]
+    fn test_parse_and_match() {
+        let pattern = "a.*b+c\\d";
+        let regex_ast = parse_regex(pattern).unwrap();
+        let regex_refs: Vec<&RegexAST> = regex_ast.iter().collect();
+        let text = "axbbbc1 a123b234c5 axbbc9";
+        let result = match_expr(regex_refs, text).unwrap();
+        assert_eq!(result, vec![(0, 7), (15, 22), (23, 29)]);
     }
 }
 
