@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 use std::collections::HashSet;
-
+use std::io::{self, Write};
 //////// CONSTANTS ////////
 lazy_static! {
     static ref WORD: HashSet<char> = num_sequence_to_char(all_letters()); // TODO: add hyphen all
@@ -14,8 +14,8 @@ enum RegexAST {
     CharLiteral(char),
     NumLiteral(u8),
     Any,
-    ZeroOrMany(Vec<RegexAST>),
-    OneOrMany(Vec<RegexAST>),
+    ZeroOrMany(Box<RegexAST>),
+    OneOrMany(Box<RegexAST>),
     WhiteSpace,
     AnyDigit,
     AnyWord,
@@ -59,6 +59,7 @@ fn all_letters() -> HashSet<u32> {
 fn match_expr(regex_expr: Vec<&RegexAST>, text_match: &str) -> Result<Vec<(usize, usize)>, String> {
     let mut matches = Vec::new();
     for start in 0..text_match.chars().count() {
+        // gå gjennom alle subset av en range, om en range inneholder
         if let Some((_, end)) = match_from_index(regex_expr.clone(), &text_match[start..], start) {
             matches.push((start, end));
         }
@@ -66,7 +67,7 @@ fn match_expr(regex_expr: Vec<&RegexAST>, text_match: &str) -> Result<Vec<(usize
     if matches.is_empty() {
         return Err("No match found".to_string());
     }
-    return Ok(matches);
+    return Ok(remove_subsets(matches));
 }
 
 fn match_from_index(
@@ -133,7 +134,7 @@ fn match_from_index(
             RegexAST::OneOrMany(one_or_many) => {
                 let mut at_least_one = false;
                 while let Some((_, end)) =
-                    match_from_index(one_or_many.iter().collect(), current_text, current_pos)
+                    match_from_index(vec![one_or_many.as_ref()], current_text, current_pos)
                 {
                     current_text = &current_text[(end - current_pos)..];
                     current_pos = end;
@@ -145,7 +146,7 @@ fn match_from_index(
             }
             RegexAST::ZeroOrMany(zero_or_many) => {
                 while let Some((_, end)) =
-                    match_from_index(zero_or_many.iter().collect(), current_text, current_pos)
+                    match_from_index(vec![zero_or_many.as_ref()], current_text, current_pos)
                 {
                     current_text = &current_text[(end - current_pos)..];
                     current_pos = end;
@@ -165,6 +166,24 @@ fn get_first_char(s: &str) -> Option<char> {
     s.chars().next()
 }
 
+fn remove_subsets(mut ranges: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
+    // Sort the ranges by their start value, and then by their end value.
+    ranges.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+
+    let mut result: Vec<(usize, usize)> = Vec::new();
+
+    for range in ranges {
+        if let Some(last) = result.last() {
+            // Check if the current range is a subset of the last range in the result.
+            if range.0 >= last.0 && range.1 <= last.1 {
+                continue;
+            }
+        }
+        result.push(range);
+    }
+
+    result
+}
 //////// Helper ////////
 
 //////// Parser ////////
@@ -194,31 +213,29 @@ fn parse_regex(text_match: &str) -> Result<Vec<RegexAST>, String> {
             }
             '*' => {
                 chars.next();
-                let mut zero_or_many: Vec<RegexAST> = Vec::new();
                 if let Some(prev_char) = prev {
                     sequence.pop();
                     let parsed = parse_regex(&prev_char.to_string())?;
                     if let Some(ast) = parsed.into_iter().next() {
-                        zero_or_many.push(ast);
+                        sequence.push(RegexAST::ZeroOrMany(Box::new(ast)));
                     }
+                } else {
+                    return Err("Syntax error: '*' found without preceding element.".to_string());
                 }
-                sequence.push(RegexAST::ZeroOrMany(zero_or_many));
             }
             '+' => {
                 chars.next();
-                let mut one_or_many: Vec<RegexAST> = Vec::new();
                 if let Some(prev_char) = prev {
                     sequence.pop();
                     let parsed = parse_regex(&prev_char.to_string())?;
                     if let Some(ast) = parsed.into_iter().next() {
-                        one_or_many.push(ast);
+                        sequence.push(RegexAST::OneOrMany(Box::new(ast)));
                     } else {
                         return Err("Error parsing previous character".to_string());
                     }
                 } else {
                     return Err("Syntax error: '+' found without preceding element.".to_string());
                 }
-                sequence.push(RegexAST::OneOrMany(one_or_many));
             }
             _ => {
                 chars.next();
@@ -255,14 +272,14 @@ mod tests {
     #[test]
     fn test_parse_zero_or_many() {
         let pattern = "a*";
-        let expected = vec![RegexAST::ZeroOrMany(vec![RegexAST::CharLiteral('a')])];
+        let expected = vec![RegexAST::ZeroOrMany(Box::new(RegexAST::CharLiteral('a')))];
         assert_eq!(parse_regex(pattern), Ok(expected));
     }
 
     #[test]
     fn test_parse_empty_zero_or_many() {
         let pattern = "*";
-        let expected = vec![RegexAST::ZeroOrMany(vec![])];
+        let expected = vec![RegexAST::ZeroOrMany(Box::new(RegexAST::Any))];
         assert_eq!(parse_regex(pattern), Ok(expected));
     }
 
@@ -271,8 +288,8 @@ mod tests {
         let pattern = "a.*b+c\\d";
         let expected = vec![
             RegexAST::CharLiteral('a'),
-            RegexAST::ZeroOrMany(vec![RegexAST::Any]),
-            RegexAST::OneOrMany(vec![RegexAST::CharLiteral('b')]),
+            RegexAST::ZeroOrMany(Box::new(RegexAST::Any)),
+            RegexAST::OneOrMany(Box::new(RegexAST::CharLiteral('b'))),
             RegexAST::CharLiteral('c'),
             RegexAST::AnyDigit,
         ];
@@ -334,6 +351,7 @@ mod tests {
         let result = match_expr(regex, text);
         assert!(result.is_err());
     }
+
     #[test]
     fn test_match_expr_multi_match() {
         let regex = vec![
@@ -354,14 +372,125 @@ mod tests {
         let pattern = "a.*b+c\\d";
         let regex_ast = parse_regex(pattern).unwrap();
         let regex_refs: Vec<&RegexAST> = regex_ast.iter().collect();
-        let text = "axbbbc1 a123b234c5 axbbc9";
+        let text = "axbc1 a123b234c5";
         let result = match_expr(regex_refs, text).unwrap();
-        assert_eq!(result, vec![(0, 7), (15, 22), (23, 29)]);
+        assert_eq!(result, vec![(0, 4)]);
+    }
+
+    #[test]
+    fn test_match_expr_zero_or_many() {
+        let zero_or_many_ast = RegexAST::ZeroOrMany(Box::new(RegexAST::CharLiteral('a')));
+        let regex = vec![&zero_or_many_ast];
+        let text = "aaaabaaa";
+        let result = match_expr(regex, text).unwrap();
+        assert_eq!(result, vec![(0, 4), (5, 8)]);
+    }
+
+    #[test]
+    fn test_match_expr_zero_or_many_empty() {
+        let zero_or_many_ast = RegexAST::ZeroOrMany(Box::new(RegexAST::CharLiteral('a')));
+        let regex = vec![&zero_or_many_ast];
+        let text = "bbbbb";
+        let result = match_expr(regex, text).unwrap();
+        assert_eq!(result, vec![(0, 0), (1, 1), (2, 2), (3, 3), (4, 4)]);
+    }
+
+    #[test]
+    fn test_match_expr_zero_or_many_with_any() {
+        let zero_or_many_ast = RegexAST::ZeroOrMany(Box::new(RegexAST::Any));
+        let regex = vec![&zero_or_many_ast];
+        let text = "abc";
+        let result = match_expr(regex, text).unwrap();
+        assert_eq!(result, vec![(0, 3)]);
+    }
+
+    #[test]
+    fn test_match_expr_one_or_many() {
+        let one_or_many_ast = RegexAST::OneOrMany(Box::new(RegexAST::CharLiteral('a')));
+        let regex = vec![&one_or_many_ast];
+        let text = "aaaabaaa";
+        let result = match_expr(regex, text).unwrap();
+        assert_eq!(result, vec![(0, 4), (5, 8)]);
+    }
+
+    #[test]
+    fn test_match_expr_one_or_many_no_match() {
+        let one_or_many_ast = RegexAST::OneOrMany(Box::new(RegexAST::CharLiteral('a')));
+        let regex = vec![&one_or_many_ast];
+        let text = "bbbbb";
+        let result = match_expr(regex, text);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_match_expr_one_or_many_with_any() {
+        let one_or_many_ast = RegexAST::OneOrMany(Box::new(RegexAST::Any));
+        let regex = vec![&one_or_many_ast];
+        let text = "abc";
+        let result = match_expr(regex, text).unwrap();
+        assert_eq!(result, vec![(0, 3)]);
+    }
+
+    #[test]
+    fn test_match_expr_zero_or_many_combined() {
+        let zero_or_many_ast = RegexAST::ZeroOrMany(Box::new(RegexAST::CharLiteral('b')));
+        let regex = vec![
+            &RegexAST::CharLiteral('a'),
+            &zero_or_many_ast,
+            &RegexAST::CharLiteral('c'),
+        ];
+        let text = "abbbc abc ac";
+        let result = match_expr(regex, text).unwrap();
+        assert_eq!(result, vec![(0, 5), (6, 9), (10, 12)]);
+    }
+
+    #[test]
+    fn test_match_expr_one_or_many_combined() {
+        let one_or_many_ast = RegexAST::OneOrMany(Box::new(RegexAST::CharLiteral('b')));
+        let regex = vec![
+            &RegexAST::CharLiteral('a'),
+            &one_or_many_ast,
+            &RegexAST::CharLiteral('c'),
+        ];
+        let text = "abbbc abc ac";
+        let result = match_expr(regex, text).unwrap();
+        assert_eq!(result, vec![(0, 5), (6, 9)]);
     }
 }
 
 //////// Tests ////////
 
 fn main() {
-    println!("Hello world!");
+    // Read user input
+    let mut pattern = String::new();
+    let mut text = String::new();
+
+    print!("Enter the regex pattern: ");
+    io::stdout().flush().unwrap();
+    io::stdin().read_line(&mut pattern).unwrap();
+    pattern = pattern.trim().to_string();
+
+    print!("Enter the text to match: ");
+    io::stdout().flush().unwrap();
+    io::stdin().read_line(&mut text).unwrap();
+    text = text.trim().to_string();
+
+    let parsed_pattern = match parse_regex(&pattern) {
+        Ok(p) => p,
+        Err(e) => {
+            println!("Error parsing pattern: {}", e);
+            return;
+        }
+    };
+
+    let parsed_pattern_refs: Vec<&RegexAST> = parsed_pattern.iter().collect();
+
+    match match_expr(parsed_pattern_refs, &text) {
+        Ok(matches) => {
+            for (start, end) in matches {
+                println!("Match found from index {} to {}", start, end);
+            }
+        }
+        Err(e) => println!("No match found: {}", e),
+    }
 }
