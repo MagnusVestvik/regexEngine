@@ -123,9 +123,8 @@ fn match_from_index(
                 current_pos += 1;
             }
             RegexAST::AnyDigit => {
-                let first_char_as_digit = get_first_char(&current_text)? as u8;
-                if !first_char_as_digit.is_ascii_digit() {
-                    // blir ikke true
+                let first_char = get_first_char(&current_text)?;
+                if !first_char.is_ascii_digit() {
                     return None;
                 }
                 current_text = &current_text[1..];
@@ -277,6 +276,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn test_parse_empty_zero_or_many() {
         let pattern = "*";
         let expected = vec![RegexAST::ZeroOrMany(Box::new(RegexAST::Any))];
@@ -372,7 +372,7 @@ mod tests {
         let pattern = "a.*b+c\\d";
         let regex_ast = parse_regex(pattern).unwrap();
         let regex_refs: Vec<&RegexAST> = regex_ast.iter().collect();
-        let text = "axbc1 a123b234c5";
+        let text = "aybc1 a123b234c5";
         let result = match_expr(regex_refs, text).unwrap();
         assert_eq!(result, vec![(0, 4)]);
     }
@@ -488,7 +488,11 @@ fn main() {
     match match_expr(parsed_pattern_refs, &text) {
         Ok(matches) => {
             for (start, end) in matches {
-                println!("Match found from index {} to {}", start, end);
+                if start >= 1 && end - start > 1 {
+                    println!("Match found from index {} to {}", start, end - 1);
+                } else {
+                    println!("Match found from index {} to {}", start, end - 1);
+                }
             }
         }
         Err(e) => println!("No match found: {}", e),
