@@ -59,7 +59,6 @@ fn all_letters() -> HashSet<u32> {
 fn match_expr(regex_expr: Vec<&RegexAST>, text_match: &str) -> Result<Vec<(usize, usize)>, String> {
     let mut matches = Vec::new();
     for start in 0..text_match.chars().count() {
-        // gå gjennom alle subset av en range, om en range inneholder
         if let Some((_, end)) = match_from_index(regex_expr.clone(), &text_match[start..], start) {
             matches.push((start, end));
         }
@@ -166,14 +165,12 @@ fn get_first_char(s: &str) -> Option<char> {
 }
 
 fn remove_subsets(mut ranges: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
-    // Sort the ranges by their start value, and then by their end value.
     ranges.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
 
     let mut result: Vec<(usize, usize)> = Vec::new();
 
     for range in ranges {
         if let Some(last) = result.last() {
-            // Check if the current range is a subset of the last range in the result.
             if range.0 >= last.0 && range.1 <= last.1 {
                 continue;
             }
@@ -191,58 +188,53 @@ fn parse_regex(text_match: &str) -> Result<Vec<RegexAST>, String> {
     let mut chars = text_match.chars().peekable();
     let mut sequence = Vec::new();
     let mut prev: Option<char> = None;
+
     while let Some(&c) = chars.peek() {
         match c {
             '\\' => {
                 chars.next();
-                if let Some(escaped) = chars.next() {
-                    match escaped {
-                        'w' => sequence.push(RegexAST::AnyWord),
-                        's' => sequence.push(RegexAST::WhiteSpace),
-                        'd' => sequence.push(RegexAST::AnyDigit),
-                        _ => sequence.push(RegexAST::AnyWord),
-                    };
-                } else {
-                    sequence.push(RegexAST::CharLiteral('\\'))
+                match chars.next() {
+                    Some('w') => sequence.push(RegexAST::AnyWord),
+                    Some('s') => sequence.push(RegexAST::WhiteSpace),
+                    Some('d') => sequence.push(RegexAST::AnyDigit),
+                    Some(escaped) => sequence.push(RegexAST::CharLiteral(escaped)),
+                    None => sequence.push(RegexAST::CharLiteral('\\')),
                 }
             }
             '.' => {
                 chars.next();
                 sequence.push(RegexAST::Any);
             }
-            '*' => {
-                chars.next();
+            '*' | '+' => {
+                let operator = chars.next().unwrap();
                 if let Some(prev_char) = prev {
                     sequence.pop();
                     let parsed = parse_regex(&prev_char.to_string())?;
                     if let Some(ast) = parsed.into_iter().next() {
-                        sequence.push(RegexAST::ZeroOrMany(Box::new(ast)));
-                    }
-                } else {
-                    return Err("Syntax error: '*' found without preceding element.".to_string());
-                }
-            }
-            '+' => {
-                chars.next();
-                if let Some(prev_char) = prev {
-                    sequence.pop();
-                    let parsed = parse_regex(&prev_char.to_string())?;
-                    if let Some(ast) = parsed.into_iter().next() {
-                        sequence.push(RegexAST::OneOrMany(Box::new(ast)));
+                        let regex_ast = match operator {
+                            '*' => RegexAST::ZeroOrMany(Box::new(ast)),
+                            '+' => RegexAST::OneOrMany(Box::new(ast)),
+                            _ => unreachable!(),
+                        };
+                        sequence.push(regex_ast);
                     } else {
                         return Err("Error parsing previous character".to_string());
                     }
                 } else {
-                    return Err("Syntax error: '+' found without preceding element.".to_string());
+                    return Err(format!(
+                        "Syntax error: '{}' found without preceding element.",
+                        operator
+                    ));
                 }
             }
             _ => {
                 chars.next();
                 sequence.push(RegexAST::CharLiteral(c));
             }
-        };
+        }
         prev = Some(c);
     }
+
     Ok(sequence)
 }
 
@@ -461,7 +453,6 @@ mod tests {
 //////// Tests ////////
 
 fn main() {
-    // Read user input
     let mut pattern = String::new();
     let mut text = String::new();
 
