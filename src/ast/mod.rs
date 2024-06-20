@@ -1,5 +1,5 @@
 #[derive(Debug, PartialEq)]
-enum RegexAST {
+pub enum RegexAST {
     CharLiteral(char),
     NumLiteral(u8),
     Any,
