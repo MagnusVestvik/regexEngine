@@ -8,26 +8,40 @@ lazy_static! {
     // numbers, and peiod.
 }
 
+/// Returns a HashSet of u32 values representing ASCII codes for capital letters (A-Z).
 fn capital_letters() -> HashSet<u32> {
     (65..=90).collect()
 }
 
+/// Returns a HashSet of u32 values representing ASCII codes for lowercase letters (a-z).
 fn small_letters() -> HashSet<u32> {
     (97..=122).collect()
 }
 
+/// Returns a HashSet of u32 values representing ASCII codes for all letters (A-Z and a-z).
 fn all_letters() -> HashSet<u32> {
     small_letters().union(&capital_letters()).copied().collect()
 }
 
+/// Returns a HashSet of u8 values representing a custom sequence from start to end (inclusive).
 fn custom_sequence(start: u8, end: u8) -> HashSet<u8> {
     return (start..=end).collect();
 }
 
+/// Returns the first character of a given string, or None if the string is empty.
 fn get_first_char(s: &str) -> Option<char> {
     s.chars().next()
 }
 
+/// Removes subsets from a vector of ranges, keeping only the largest non-overlapping ranges.
+///
+/// # Arguments
+///
+/// * `ranges` - A vector of tuples representing ranges (start, end).
+///
+/// # Returns
+///
+/// A vector of tuples representing the non-subset ranges.
 fn remove_subsets(mut ranges: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
     ranges.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
 
@@ -45,6 +59,15 @@ fn remove_subsets(mut ranges: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
     result
 }
 
+/// Converts a HashSet of u32 values to a HashSet of corresponding char values.
+///
+/// # Arguments
+///
+/// * `range` - A HashSet of u32 values representing character codes.
+///
+/// # Returns
+///
+/// A HashSet of char values corresponding to the input u32 values.
 fn num_sequence_to_char(range: HashSet<u32>) -> HashSet<char> {
     range
         .clone()
@@ -53,6 +76,17 @@ fn num_sequence_to_char(range: HashSet<u32>) -> HashSet<char> {
         .collect()
 }
 
+/// Matches a regex expression against a given text and returns all matching ranges.
+///
+/// # Arguments
+///
+/// * `regex_expr` - A vector of references to RegexAST nodes representing the regex expression.
+/// * `text_match` - The text to match against.
+///
+/// # Returns
+///
+/// A Result containing a vector of tuples representing the matching ranges (start, end),
+/// or an error string if no matches are found.
 pub fn match_expr(
     regex_expr: Vec<&RegexAST>,
     text_match: &str,
@@ -69,6 +103,17 @@ pub fn match_expr(
     return Ok(remove_subsets(matches));
 }
 
+/// Attempts to match a regex expression starting from a given index in the text.
+///
+/// # Arguments
+///
+/// * `regex_expr` - A vector of references to RegexAST nodes representing the regex expression.
+/// * `text` - The text to match against.
+/// * `start` - The starting index in the text.
+///
+/// # Returns
+///
+/// An Option containing a tuple of (start, end) indices if a match is found, or None if no match.
 fn match_from_index(
     regex_expr: Vec<&RegexAST>,
     text: &str,
@@ -241,12 +286,13 @@ mod tests {
     }
 
     #[test]
-    fn test_match_expr_zero_or_many_empty() {
+    fn test_match_expr_zero_or_many_no_match() {
         let zero_or_many_ast = RegexAST::ZeroOrMany(Box::new(RegexAST::CharLiteral('a')));
         let regex = vec![&zero_or_many_ast];
-        let text = "bbbbb";
-        let result = match_expr(regex, text);
-        assert!(result.is_err()); // TODO: failer test
+        let text = "bbb";
+        let result = match_expr(regex, text).unwrap();
+        assert_eq!(result, vec![(0, 0), (1, 1), (2, 2), (3, 3)]); // Should find all the empty strings
+                                                                  // between the characters since it matches on zero or many.
     }
 
     #[test]
